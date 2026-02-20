@@ -75,13 +75,14 @@ open macos/Ghostty.xcodeproj       # Xcode iteration (after first zig build)
 **Files to modify (upstream Ghostty — 2 files):**
 
 1. `macos/Sources/Features/Terminal/TerminalController.swift`
-   - In `windowDidLoad()`: swap `TerminalViewContainer` → `WorkspaceViewContainer`
-   - Add toolbar installation
-   - Add Combine sync for sidebar state across tabs
+   - In `windowDidLoad()`: replace the line that creates `TerminalViewContainer(ghostty:surfaceView:)` with `WorkspaceViewContainer(ghostty:surfaceView:)` — same init signature, drop-in swap
+   - Add toolbar installation for sidebar toggle button
+   - Add Combine sync for sidebar state across tabs (so all tabs share the same sidebar selection)
+   - **Note:** Ghostty's existing tab bar remains untouched — tabs and the workspace sidebar are independent. Each tab gets its own `WorkspaceViewContainer` but they share the same `WorkspaceStore`
 
 2. `macos/Sources/App/macOS/AppDelegate.swift`
-   - Create and hold `WorkspaceStore.shared` singleton
-   - Inject into window controllers
+   - Create and hold `WorkspaceStore.shared` singleton (one line in `applicationDidFinishLaunching`)
+   - Pass store reference when creating window controllers
 
 **Files to create (new feature directory):**
 
@@ -100,7 +101,8 @@ macos/Sources/Features/Ghostties/
     StatusIndicatorView.swift      ← Animated status ring
   Models/
     Project.swift                  ← id, name, rootPath, isPinned, templates
-    AgentSession.swift             ← id, surface reference, template, status
+    AgentSession.swift             ← id, templateId, projectId (persistent, Codable)
+    AgentSessionRuntime.swift      ← surfaceView reference, live status, exitCode (runtime only)
 ```
 
 ### Key Architecture Patterns
@@ -128,10 +130,14 @@ HStack(spacing: 0) {
 
 ### Forked Identifiers to Change
 
-- `macos/Ghostty.xcodeproj/project.pbxproj` — bundle ID, marketing version (6 occurrences)
-- `macos/Ghostty-Info.plist` — display name
-- `src/build_config.zig` — app identifier
-- Swift files referencing `com.mitchellh.ghostty` → `com.seansmithdesign.ghostties`
+| File | Find | Replace |
+|------|------|---------|
+| `macos/Ghostty.xcodeproj/project.pbxproj` | `com.mitchellh.ghostty` | `com.seansmithdesign.ghostties` |
+| `macos/Ghostty.xcodeproj/project.pbxproj` | `MARKETING_VERSION = 1.2.0` | `MARKETING_VERSION = 0.1.0` |
+| `macos/Ghostty-Info.plist` | `Ghostty` (display name) | `Ghostties` |
+| `src/build_config.zig` | `com.mitchellh.ghostty` | `com.seansmithdesign.ghostties` |
+
+**Note:** Search the entire codebase for `com.mitchellh.ghostty` — there may be additional occurrences in entitlements or notification identifiers.
 
 ---
 
@@ -146,10 +152,10 @@ HStack(spacing: 0) {
 - [ ] Open Xcode project, verify Swift iteration loop works
 - [ ] Create empty `Ghostties/` feature directory
 - [ ] Create `WorkspaceViewContainer.swift` (NSHostingView wrapper)
-- [ ] Create minimal `WorkspaceView.swift` with hardcoded placeholder sidebar + terminal
-- [ ] Modify `TerminalController.swift` — swap contentView to WorkspaceViewContainer
-- [ ] Note: no WorkspaceStore yet — Phase 1 sidebar is static/hardcoded. AppDelegate changes happen in Phase 2
-- [ ] Verify: app launches with a visible (placeholder) sidebar + working terminal
+- [ ] Create minimal `WorkspaceView.swift` — hardcoded `List { Text("Project A"); Text("Project B") }` in sidebar column, `TerminalView` in detail column
+- [ ] Modify `TerminalController.swift` — swap contentView to WorkspaceViewContainer (one-line change in `windowDidLoad()`)
+- [ ] Note: no WorkspaceStore yet — Phase 1 sidebar is static/hardcoded. AppDelegate changes happen in Phase 2. Tab bar remains unchanged.
+- [ ] Verify: app launches with a visible (placeholder) sidebar + working terminal. Existing Ghostty features (splits, tabs, config) still work.
 
 ### Phase 2: Icon Rail + Project Management (2 sessions)
 
@@ -261,6 +267,34 @@ AgentSession (persistent - Codable)     AgentSessionRuntime (runtime only)
   lastExitCode: Int32?
 ```
 
+## Design Brief
+
+**Layers:** bringhurst + rams | **Aesthetic:** linear-mercury (adapted for SwiftUI) | **Strictness:** standard
+
+### Craft (Bringhurst)
+- **Rhythm base:** 8px grid. Spacing multiples: 4, 8, 12, 16, 24, 32
+- **Type scale:** Minor third (1.2) — 11px (caption), 13px (body), 16px (headers), 19px (rare)
+- **Weight palette:** `.semibold` (project names), `.medium` (emphasis), `.regular` (body)
+- **Restraint:** SF Pro system font only. No custom fonts. Max 3 weights per view.
+
+### Aesthetic (Linear Mercury → SwiftUI)
+- **Color:** System semantic colors only — `.primary`, `.secondary`, `.accentColor`. 90% neutrals, 8% accent, 2% status. Status: system green (running), system red (failed), `.secondary` (idle/done).
+- **Sidebar background:** `VisualEffectView` with `.sidebar` material (standard macOS vibrancy)
+- **Icon rail:** `.windowBackgroundColor` or darker material for depth contrast
+- **Elevation:** No custom shadows. macOS materials handle depth. Selected = accent background.
+- **Motion:** Icon rail expand: `.spring(response: 0.3, dampingFraction: 0.75)`. Sidebar toggle: `0.2s` ease. Running status: subtle pulse. Hover highlight: instant. Respect `accessibilityDisplayShouldReduceMotion`.
+- **Components:** Native macOS patterns — `.popover` for template picker, `.contextMenu` for CRUD, `NSAlert` for confirmations. No custom modals.
+- **Anti-patterns:** No hardcoded colors, no custom fonts, no spring/bounce, no gradients, no `shadow-xl` equivalent.
+
+### A11y (RAMS)
+- **Touch targets:** 44px minimum hit area on all sidebar items
+- **Focus:** Native SwiftUI focus ring. All items keyboard-navigable.
+- **Accessibility labels:** Project icons, session items, status indicators all need labels (not color-only)
+- **Reduced motion:** Check `accessibilityDisplayShouldReduceMotion` — if true, instant icon rail width change
+- **Required states:** Sessions: running/idle/done/failed. Projects: selected/unselected/hover.
+
+---
+
 ## Open Questions (defer to later phases)
 
 - [ ] Session type auto-detection (detect Claude Code vs dev server)
@@ -268,6 +302,7 @@ AgentSession (persistent - Codable)     AgentSessionRuntime (runtime only)
 - [ ] Ghostty 1.3 window naming integration
 - [ ] Possible official add-on/plugin path (pending Mitchell conversation)
 - [ ] Custom status indicator animation design
+- [ ] **libghostty migration path** — Ghostty is being modularized into a family of libraries ([libghostty docs](https://libghostty.tip.ghostty.org/)). `libghostty-vt` (terminal emulator core) is in public alpha. A future Swift framework would let us embed Ghostty's terminal as a library instead of forking. Timeline is long (2027+), but worth tracking as a potential v2 architecture.
 
 ---
 
@@ -292,3 +327,4 @@ AgentSession (persistent - Codable)     AgentSessionRuntime (runtime only)
 - NSHostingView sizing: [mjtsai.com](https://mjtsai.com/blog/2023/08/03/how-nshostingview-determines-its-sizing/)
 - @Observable multi-window bug: [fatbobman.com](https://fatbobman.com/en/posts/the-state-specter-analyzing-a-bug-in-multi-window-swiftui-applications/)
 - Ghostty build docs: [ghostty.org/docs/install/build](https://ghostty.org/docs/install/build)
+- libghostty (modular library family): [libghostty.tip.ghostty.org](https://libghostty.tip.ghostty.org/index.html)
