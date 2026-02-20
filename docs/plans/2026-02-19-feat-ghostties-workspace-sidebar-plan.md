@@ -2,7 +2,7 @@
 title: "feat: Ghostties — Workspace sidebar for Ghostty"
 type: feat
 date: 2026-02-19
-brainstorm: docs/brainstorms/2026-02-19-ghostagent-brainstorm.md
+brainstorm: docs/brainstorms/2026-02-19-ghostties-brainstorm.md
 ---
 
 # Ghostties — Multi-project workspace sidebar for Ghostty
@@ -11,7 +11,7 @@ brainstorm: docs/brainstorms/2026-02-19-ghostagent-brainstorm.md
 
 Fork Ghostty and add a native sidebar for managing multiple projects and terminal sessions (AI agents, dev servers, shells) from a single integrated window. The sidebar has a hover-expand icon rail on the far left and a session detail panel, with Ghostty's native terminal + splits on the right.
 
-**Brainstorm:** [2026-02-19-ghostagent-brainstorm.md](../brainstorms/2026-02-19-ghostagent-brainstorm.md)
+**Brainstorm:** [2026-02-19-ghostties-brainstorm.md](../brainstorms/2026-02-19-ghostties-brainstorm.md)
 
 ## Problem Statement
 

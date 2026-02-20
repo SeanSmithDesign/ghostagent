@@ -1,6 +1,6 @@
-# GhostAgent Brainstorm — 2026-02-19
+# Ghostties Brainstorm — 2026-02-19
 
-> Working name: "GhostAgent" (placeholder — something between Ghostty and agent, TBD)
+> **Name: Ghostties** — Ghostty + multi-project workspace management
 
 ## What We're Building
 
@@ -65,7 +65,7 @@ Not just AI agents — dev servers, file watchers, build processes, shells. Anyt
 
 ### Files to create (new feature directory):
 ```
-macos/Sources/Features/GhostAgent/
+macos/Sources/Features/Ghostties/
   WorkspaceView.swift              ← NavigationSplitView wrapper (icon rail + detail + terminal)
   WorkspaceViewContainer.swift     ← NSHostingView wrapper replacing TerminalViewContainer
   WorkspaceStore.swift             ← ObservableObject: projects, sessions, templates
